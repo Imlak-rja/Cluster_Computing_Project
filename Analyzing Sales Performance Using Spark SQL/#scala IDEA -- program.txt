@@ -1,0 +1,102 @@
+#scala IDEA --> program and python idea program
+
+package org.project.salesperformance
+
+import org.apache.spark.sql.SparkSession
+
+object Main {
+  def main(args: Array[String]): Unit = {
+
+    val spark = SparkSession.builder().master("local[1]").appName("Sales Data Analysis").getOrCreate()
+
+    val df = spark.read.option("header", true).csv("C:/sparkScalaLib/code/project_sales_data.csv")
+
+    df.printSchema()
+    df.show()
+
+    df.createOrReplaceTempView("sales") // Register the DataFrame as a temporary SQL table
+
+    // Task 3: Total revenue by category
+    val revenueByCategory = spark.sql(""" SELECT Category, SUM(Revenue) AS TotalRevenue FROM sales GROUP BY Category ORDER BY TotalRevenue DESC """)
+    revenueByCategory.show()
+
+    // Task 4: Monthly sales by region
+    val monthlySales = spark.sql(""" SELECT Region, SUBSTRING(OrderDate, 4, 2) AS Month, SUM(Revenue) AS MonthlySales FROM sales GROUP BY Region, Month ORDER BY Region, Month """)
+    monthlySales.show()
+
+    // Task 5: Top 3 best-selling products
+    val topProducts = spark.sql(""" SELECT Product, SUM(Quantity) AS TotalQuantity FROM sales GROUP BY Product ORDER BY TotalQuantity DESC LIMIT 3 """)
+    topProducts.show()
+
+    // Task 6: Visualize monthly sales trend (save to CSV)
+    monthlySales.coalesce(1).write.option("header", "true").csv("C:/sparkScalaLib/code/monthly_sales.csv")
+
+    // Task 7: Average price per category (using a subquery)
+    val avgPriceByCategory = spark.sql(""" SELECT Category, AVG(Price) AS AveragePrice FROM (SELECT Category, Price FROM sales) AS product_prices GROUP BY Category ORDER BY AveragePrice DESC """)
+    avgPriceByCategory.show()
+
+    // Task 8: Find the region with the highest total revenue (using a subquery)
+    val highestRevenueRegion = spark.sql(""" SELECT Region, TotalRevenue FROM (SELECT Region, SUM(Revenue) AS TotalRevenue FROM sales GROUP BY Region) AS region_revenue WHERE TotalRevenue = (SELECT MAX(TotalRevenue) FROM (SELECT SUM(Revenue) AS TotalRevenue FROM sales GROUP BY Region) AS max_revenue) """)
+    highestRevenueRegion.show()
+
+    // Task 9: Visualize total revenue by product category (save to CSV)
+    revenueByCategory.coalesce(1).write.option("header", "true").csv("C:/sparkScalaLib/code/revenue_by_category.csv")
+
+    // Task 10: Find products with revenue greater than the average revenue
+    val productsAboveAvgRevenue = spark.sql(""" SELECT Product, Revenue FROM sales WHERE Revenue > (SELECT AVG(Revenue) FROM sales) """)
+    productsAboveAvgRevenue.show()
+
+    spark.stop()
+  }
+}
+
+
+#python program
+
+
+# Part 1: Visualization for Task 6 - Monthly Sales Performance
+
+import pandas as pd
+import glob
+import matplotlib.pyplot as plt
+
+file_list_monthly = glob.glob("C:/sparkScalaLib/code/monthly_sales.csv/part-*.csv")
+
+if file_list_monthly:
+    df_monthly = pd.read_csv(file_list_monthly[0])
+    monthly_totals = df_monthly.groupby("Month")["MonthlySales"].sum().reset_index()
+    plt.figure(figsize=(10, 6))
+    plt.plot(monthly_totals["Month"], monthly_totals["MonthlySales"], marker="o")
+    plt.title("Total Monthly Sales Performance")
+    plt.xlabel("Month")
+    plt.ylabel("Total Monthly Sales")
+    plt.grid(True)
+    plt.savefig("monthly_sales_performance.png")  # Save the plot
+    plt.show()
+else:
+    print("No part files found for monthly sales!")
+
+
+
+# Part 2: Visualization for Task 9 - Total Revenue by Product Category
+import pandas as pd
+import glob
+import matplotlib.pyplot as plt
+
+file_list_category = glob.glob("C:/sparkScalaLib/code/revenue_by_category.csv/part-*.csv")
+
+if file_list_category:
+    df_category = pd.read_csv(file_list_category[0])
+    plt.figure(figsize=(10, 6))
+    plt.bar(df_category["Category"], df_category["TotalRevenue"])
+    plt.title("Total Revenue by Product Category")
+    plt.xlabel("Category")
+    plt.ylabel("Total Revenue")
+    plt.xticks(rotation=45)
+    plt.tight_layout()
+    plt.savefig("revenue_by_category.png")  # Save the plot
+    plt.show()
+else:
+    print("No part files found for category revenue!")
+
+
